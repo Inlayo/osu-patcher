@@ -64,17 +64,15 @@ internal static class Injector
             throw new InvalidOperationException(
                 "An _staging file or folder already exists in the osu! folder. Remove it before starting the patcher.");
 
-        var createdStagingFile = false;
+        var createdStagingDirectory = false;
         try
         {
-            using (new FileStream(stagingPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-            {
-                createdStagingFile = true;
-            }
+            Directory.CreateDirectory(stagingPath);
+            createdStagingDirectory = true;
+            var stagingDirectory = new DirectoryInfo(stagingPath);
+            stagingDirectory.Attributes |= FileAttributes.ReadOnly;
 
-            File.SetAttributes(stagingPath, FileAttributes.ReadOnly);
-
-            for (var attempt = 0; ; attempt++)
+            for (var attempt = 0; attempt < 2; attempt++)
             {
                 using var osuProcess = Process.Start(startInfo)
                     ?? throw new InvalidOperationException("Failed to start osu!.");
@@ -89,20 +87,54 @@ internal static class Injector
                     continue;
                 }
 
-                using var proc = new InjectableProcess((uint)osuProcess.Id);
-                var dllPath = Path.Combine(injectionDirectory, "osu!.hook.dll");
-                proc.Inject(dllPath, "Osu.Patcher.Hook.Hook", "Initialize");
-                return;
+                try
+                {
+                    InjectIntoProcess(osuProcess.Id, injectionDirectory);
+                    return;
+                }
+                catch
+                {
+                    StopOsuProcess(osuProcess);
+                    if (attempt == 0)
+                        continue;
+
+                    throw;
+                }
             }
         }
         finally
         {
-            if (createdStagingFile && File.Exists(stagingPath))
+            if (createdStagingDirectory && Directory.Exists(stagingPath))
             {
-                File.SetAttributes(stagingPath, FileAttributes.Normal);
-                File.Delete(stagingPath);
+                var stagingDirectory = new DirectoryInfo(stagingPath);
+                stagingDirectory.Attributes &= ~FileAttributes.ReadOnly;
+                stagingDirectory.Delete();
             }
         }
+    }
+
+    private static void InjectIntoProcess(int processId, string injectionDirectory)
+    {
+        using var proc = new InjectableProcess((uint)processId);
+        var dllPath = Path.Combine(injectionDirectory, "osu!.hook.dll");
+        proc.Inject(dllPath, "Osu.Patcher.Hook.Hook", "Initialize");
+    }
+
+    private static void StopOsuProcess(Process process)
+    {
+        if (process.HasExited)
+            return;
+
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException) when (process.HasExited)
+        {
+            return;
+        }
+
+        process.WaitForExit();
     }
 
     /// <summary>
