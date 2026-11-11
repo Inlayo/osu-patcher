@@ -64,13 +64,15 @@ internal static class Injector
             throw new InvalidOperationException(
                 "An _staging file or folder already exists in the osu! folder. Remove it before starting the patcher.");
 
-        var createdStagingDirectory = false;
+        var createdStagingFile = false;
         try
         {
-            Directory.CreateDirectory(stagingPath);
-            createdStagingDirectory = true;
-            var stagingDirectory = new DirectoryInfo(stagingPath);
-            stagingDirectory.Attributes |= FileAttributes.ReadOnly;
+            using (new FileStream(stagingPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                createdStagingFile = true;
+            }
+
+            File.SetAttributes(stagingPath, FileAttributes.ReadOnly);
 
             for (var attempt = 0; attempt < 2; attempt++)
             {
@@ -104,11 +106,10 @@ internal static class Injector
         }
         finally
         {
-            if (createdStagingDirectory && Directory.Exists(stagingPath))
+            if (createdStagingFile && File.Exists(stagingPath))
             {
-                var stagingDirectory = new DirectoryInfo(stagingPath);
-                stagingDirectory.Attributes &= ~FileAttributes.ReadOnly;
-                stagingDirectory.Delete();
+                File.SetAttributes(stagingPath, FileAttributes.Normal);
+                File.Delete(stagingPath);
             }
         }
     }
