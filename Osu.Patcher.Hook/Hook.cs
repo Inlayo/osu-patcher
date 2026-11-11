@@ -2,7 +2,6 @@ using System;
 using HarmonyLib;
 using JetBrains.Annotations;
 using Osu.Patcher.Hook.Patches;
-using Osu.Stubs.Wrappers;
 
 namespace Osu.Patcher.Hook;
 
@@ -25,17 +24,14 @@ public static class Hook
         try
         {
             var successful = InitializePatches(new Harmony("osu!patcher"), out var patchCount);
-            Console.WriteLine($"Initialized {patchCount} patches.");
-
-            if (successful && patchCount > 0)
-                Notifications.ShowMessage("Inlayo-patcher has launched!", NotificationColor.Neutral, 4000);
-            else
-                ShowErrorNotification();
+            Console.WriteLine(
+                successful
+                    ? $"Initialized {patchCount} patches."
+                    : $"Initialized {patchCount} patches with errors.");
         }
         catch (Exception e)
         {
             Console.WriteLine(e);
-            ShowErrorNotification();
         }
 
         return 0;
@@ -72,24 +68,5 @@ public static class Hook
         }
 
         return successful;
-    }
-
-    /// <summary>
-    ///     Show a generic error notification to the user.
-    /// </summary>
-    private static void ShowErrorNotification()
-    {
-        try
-        {
-            Notifications.ShowMessage(
-                "Inlayo-patcher experienced an error!",
-                NotificationColor.Error,
-                3000);
-        }
-        catch (Exception e2)
-        {
-            Console.WriteLine("Failed to show error notification!");
-            Console.WriteLine(e2);
-        }
     }
 }
