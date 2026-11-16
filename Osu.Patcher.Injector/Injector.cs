@@ -3,9 +3,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.Loader;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using HoLLy.ManagedInjector;
 
@@ -33,6 +35,7 @@ internal static class Injector
             var osuPath = FindOsuExecutable();
             SaveSettings(osuPath);
             var injectionDirectory = DownloadInjectionFiles();
+            LoadInjectorDependencies(injectionDirectory);
 
             var startInfo = new ProcessStartInfo
             {
@@ -40,7 +43,6 @@ internal static class Injector
                 WorkingDirectory = Path.GetDirectoryName(osuPath)!,
                 UseShellExecute = false,
             };
-            startInfo.ArgumentList.Add("-nosplash");
             startInfo.ArgumentList.Add("-devserver");
             startInfo.ArgumentList.Add(ServerAddress);
 
@@ -210,18 +212,21 @@ internal static class Injector
 
     private static string DownloadInjectionFiles()
     {
-        var files = new[]
+        var files = Task.WhenAll(new[]
         {
             "osu!.hook.dll",
             "osu!.stubs.dll",
             "utils.dll",
             "0Harmony.dll",
             "JetBrains.Annotations.dll",
-        }.Select(file => (
+            "ManagedInjector.Lib.dll",
+            "Iced.dll",
+        }.Select(async file => (
             Name: file,
-            Contents: Http.GetByteArrayAsync(new Uri(new Uri(InjectionFilesBaseUrl), file))
-                .GetAwaiter()
-                .GetResult())).ToArray();
+            Contents: await Http.GetByteArrayAsync(new Uri(new Uri(InjectionFilesBaseUrl), file))
+                .ConfigureAwait(false))))
+            .GetAwaiter()
+            .GetResult();
 
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var file in files)
@@ -243,6 +248,14 @@ internal static class Injector
         }
 
         return injectionDirectory;
+    }
+
+    private static void LoadInjectorDependencies(string injectionDirectory)
+    {
+        AssemblyLoadContext.Default.LoadFromAssemblyPath(
+            Path.Combine(injectionDirectory, "Iced.dll"));
+        AssemblyLoadContext.Default.LoadFromAssemblyPath(
+            Path.Combine(injectionDirectory, "ManagedInjector.Lib.dll"));
     }
 
     private static void WaitForSupportedTarget(Process process)

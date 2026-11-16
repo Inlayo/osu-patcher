@@ -16,11 +16,56 @@
         <DebugType>none</DebugType>
         <Optimize>true</Optimize>
     </PropertyGroup>
+    <PropertyGroup>
+        <HookOutputDirectory>$(MSBuildProjectDirectory)\..\Osu.Patcher.Hook\bin\$(Configuration)\net452\</HookOutputDirectory>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+        <HookOutputDirectory>$(HookOutputDirectory)$(RuntimeIdentifier)\</HookOutputDirectory>
+    </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="HoLLy.ManagedInjector" Version="1.0.0"/>
+        <PackageReference Include="HoLLy.ManagedInjector" Version="1.0.0" ExcludeAssets="runtime" GeneratePathProperty="true"/>
+        <PackageReference Include="Iced" Version="1.11.2" ExcludeAssets="runtime" GeneratePathProperty="true"/>
         <ProjectReference Include="../Osu.Patcher.Hook/Osu.Patcher.Hook.csproj">
             <SetTargetFramework>TargetFramework=net452</SetTargetFramework>
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
     </ItemGroup>
+    <Target Name="PrepareInjectionDllsForPublish" BeforeTargets="_ComputeFilesToBundle">
+        <ItemGroup>
+            <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                                   Condition="'%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'osu!.hook.dll' Or
+                                              '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'osu!.stubs.dll' Or
+                                              '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'utils.dll' Or
+                                              '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == '0Harmony.dll' Or
+                                              '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' == 'JetBrains.Annotations.dll'"/>
+            <ResolvedFileToPublish Include="$(HookOutputDirectory)osu!.hook.dll"
+                                   RelativePath="osu!.hook.dll"
+                                   CopyToPublishDirectory="PreserveNewest"
+                                   ExcludeFromSingleFile="true"/>
+            <ResolvedFileToPublish Include="$(HookOutputDirectory)osu!.stubs.dll"
+                                   RelativePath="osu!.stubs.dll"
+                                   CopyToPublishDirectory="PreserveNewest"
+                                   ExcludeFromSingleFile="true"/>
+            <ResolvedFileToPublish Include="$(HookOutputDirectory)utils.dll"
+                                   RelativePath="utils.dll"
+                                   CopyToPublishDirectory="PreserveNewest"
+                                   ExcludeFromSingleFile="true"/>
+            <ResolvedFileToPublish Include="$(HookOutputDirectory)0Harmony.dll"
+                                   RelativePath="0Harmony.dll"
+                                   CopyToPublishDirectory="PreserveNewest"
+                                   ExcludeFromSingleFile="true"/>
+            <ResolvedFileToPublish Include="$(HookOutputDirectory)JetBrains.Annotations.dll"
+                                   RelativePath="JetBrains.Annotations.dll"
+                                   CopyToPublishDirectory="PreserveNewest"
+                                   ExcludeFromSingleFile="true"/>
+            <ResolvedFileToPublish Include="$(PkgHoLLy_ManagedInjector)\lib\netstandard2.0\ManagedInjector.Lib.dll"
+                                   RelativePath="ManagedInjector.Lib.dll"
+                                   CopyToPublishDirectory="PreserveNewest"
+                                   ExcludeFromSingleFile="true"/>
+            <ResolvedFileToPublish Include="$(PkgIced)\lib\netstandard2.1\Iced.dll"
+                                   RelativePath="Iced.dll"
+                                   CopyToPublishDirectory="PreserveNewest"
+                                   ExcludeFromSingleFile="true"/>
+        </ItemGroup>
+    </Target>
 </Project>
