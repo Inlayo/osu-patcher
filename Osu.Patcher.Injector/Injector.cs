@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -14,6 +15,8 @@ namespace Osu.Patcher.Injector;
 internal static class Injector
 {
     private const string ServerAddress = "inlayo.com";
+    private const string InjectionFilesBaseUrl = "https://assets.inlayo.com/patcher/";
+    private static readonly HttpClient Http = new();
     private static readonly string DefaultOsuDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "osu!");
@@ -29,7 +32,7 @@ internal static class Injector
         {
             var osuPath = FindOsuExecutable();
             SaveSettings(osuPath);
-            var injectionDirectory = ExtractInjectionFiles();
+            var injectionDirectory = DownloadInjectionFiles();
 
             var startInfo = new ProcessStartInfo
             {
@@ -205,9 +208,8 @@ internal static class Injector
                 new JsonSerializerOptions { WriteIndented = true }));
     }
 
-    private static string ExtractInjectionFiles()
+    private static string DownloadInjectionFiles()
     {
-        var assembly = typeof(Injector).Assembly;
         var files = new[]
         {
             "osu!.hook.dll",
@@ -215,7 +217,11 @@ internal static class Injector
             "utils.dll",
             "0Harmony.dll",
             "JetBrains.Annotations.dll",
-        }.Select(file => (Name: file, Contents: ReadEmbeddedFile(assembly, $"InjectionFiles.{file}"))).ToArray();
+        }.Select(file => (
+            Name: file,
+            Contents: Http.GetByteArrayAsync(new Uri(new Uri(InjectionFilesBaseUrl), file))
+                .GetAwaiter()
+                .GetResult())).ToArray();
 
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var file in files)
@@ -283,15 +289,6 @@ internal static class Injector
                 "Could not inspect the game process. Run the patcher and osu! at the same privilege level.",
         };
         throw new TimeoutException($"Cannot inject into osu! (PID {processId}): {detail} Status: {lastStatus}.");
-    }
-
-    private static byte[] ReadEmbeddedFile(System.Reflection.Assembly assembly, string resourceName)
-    {
-        using var stream = assembly.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException($"Embedded injection file not found: {resourceName}");
-        using var contents = new MemoryStream();
-        stream.CopyTo(contents);
-        return contents.ToArray();
     }
 
     private static void WaitForGameWindow(Process process)

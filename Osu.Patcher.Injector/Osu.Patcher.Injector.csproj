@@ -16,21 +16,11 @@
         <DebugType>none</DebugType>
         <Optimize>true</Optimize>
     </PropertyGroup>
-    <PropertyGroup>
-        <HookOutputDirectory>$(MSBuildProjectDirectory)\..\Osu.Patcher.Hook\bin\$(Configuration)\net452\</HookOutputDirectory>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
-        <HookOutputDirectory>$(HookOutputDirectory)$(RuntimeIdentifier)\</HookOutputDirectory>
-    </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="HoLLy.ManagedInjector" Version="1.0.0"/>
         <ProjectReference Include="../Osu.Patcher.Hook/Osu.Patcher.Hook.csproj">
             <SetTargetFramework>TargetFramework=net452</SetTargetFramework>
+            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
-        <EmbeddedResource Include="$(HookOutputDirectory)osu!.hook.dll" LogicalName="InjectionFiles.osu!.hook.dll"/>
-        <EmbeddedResource Include="$(HookOutputDirectory)osu!.stubs.dll" LogicalName="InjectionFiles.osu!.stubs.dll"/>
-        <EmbeddedResource Include="$(HookOutputDirectory)utils.dll" LogicalName="InjectionFiles.utils.dll"/>
-        <EmbeddedResource Include="$(HookOutputDirectory)0Harmony.dll" LogicalName="InjectionFiles.0Harmony.dll"/>
-        <EmbeddedResource Include="$(HookOutputDirectory)JetBrains.Annotations.dll" LogicalName="InjectionFiles.JetBrains.Annotations.dll"/>
     </ItemGroup>
 </Project>

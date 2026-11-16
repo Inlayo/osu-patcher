@@ -35,8 +35,19 @@ On first launch, the patcher looks for `osu!.exe` in common install locations, c
 The selected path is saved to `%LOCALAPPDATA%\Inlayo-patcher\settings.json` for future launches.
 The patcher temporarily creates a read-only `_staging` file in the osu! folder to prevent the
 client from applying updates, then starts osu! with `-nosplash -devserver inlayo.com` and applies the
-patches. The file is removed after injection (or if startup fails). If osu! exits during startup, the
-patcher retries once before showing an error.
+patches. Before launch, the patcher downloads the injection DLLs from
+`https://assets.inlayo.com/patcher/` and caches them under `%TEMP%\Inlayo-patcher\injection`.
+The following files must be available directly at that URL:
+
+- `osu!.hook.dll`
+- `osu!.stubs.dll`
+- `utils.dll`
+- `0Harmony.dll`
+- `JetBrains.Annotations.dll`
+
+An internet connection is required each time the patcher starts. The `_staging` file is removed
+after injection (or if startup fails). If osu! exits during startup, the patcher retries once before
+showing an error.
 
 Latest tested `Stable` version: [`b20250309.2`](https://osu.ppy.sh/home/changelog/stable40/20250309.2).
 
@@ -52,8 +63,8 @@ into processes. If you aren't convinced it isn't a false positive, feel free to 
    ```
 3. Output will be located in `./Osu.Patcher.Injector/bin/Release/net8.0-windows/win-x86/publish/` with
    `Inlayo-patcher.exe` as the single-file launcher. The .NET 8 Desktop Runtime (x86) must be installed on the
-   target computer. The injection DLLs are embedded in the EXE and extracted to `%TEMP%\Inlayo-patcher\injection` at
-   runtime, so the publish folder contains only the executable.
+   target computer. The injection DLLs are downloaded at launch from
+   `https://assets.inlayo.com/patcher/`, so the publish folder contains only the executable.
 
 ## How
 
