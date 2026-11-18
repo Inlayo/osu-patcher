@@ -18,7 +18,8 @@ Using this on official Bancho servers WILL get you banned.
 - Show misses on hit objects while playing Relax
 - Re-enable combo break sounds with Relax enabled
 - Automatically save Relax scores to local leaderboards
-- Re-enable the low HP glow with shaders on
+
+The low-HP glow patch is intentionally excluded because it modifies osu!'s bloom/shader update path.
 
 <sup>Note: Relax refers to Relax *or* Autopilot</sup>
 
