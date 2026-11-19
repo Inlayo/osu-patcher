@@ -1,7 +1,9 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Runtime.Loader;
 using System.Runtime.Versioning;
@@ -18,7 +20,7 @@ internal static class Injector
 {
     private const string ServerAddress = "inlayo.com";
     private const string InjectionFilesBaseUrl = "https://assets.inlayo.com/patcher/";
-    private static readonly HttpClient Http = new();
+    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private static readonly string DefaultOsuDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "osu!");
@@ -33,6 +35,7 @@ internal static class Injector
         try
         {
             var osuPath = FindOsuExecutable();
+            EnsureOsuNotRunning();
             SaveSettings(osuPath);
             var injectionDirectory = DownloadInjectionFiles();
             LoadInjectorDependencies(injectionDirectory);
@@ -48,14 +51,14 @@ internal static class Injector
 
             LaunchAndInject(startInfo, injectionDirectory);
         }
-        catch (OperationCanceledException)
+        catch (UserCancelledException)
         {
             return;
         }
         catch (Exception e)
         {
             MessageBox.Show(
-                e.Message,
+                GetUserFacingError(e),
                 "Inlayo-patcher",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
@@ -67,7 +70,7 @@ internal static class Injector
         var stagingPath = Path.Combine(startInfo.WorkingDirectory, "_staging");
         if (File.Exists(stagingPath) || Directory.Exists(stagingPath))
             throw new InvalidOperationException(
-                "An _staging file or folder already exists in the osu! folder. Remove it before starting the patcher.");
+                "osu! is already updating or an update-blocking file exists. Close osu!, remove the _staging file from its folder, and try again.");
 
         var createdStagingFile = false;
         try
@@ -79,34 +82,30 @@ internal static class Injector
 
             File.SetAttributes(stagingPath, FileAttributes.ReadOnly);
 
-            for (var attempt = 0; attempt < 2; attempt++)
+            using var osuProcess = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Windows could not start osu!. Check the selected osu!.exe and try again.");
+
+            try
             {
-                using var osuProcess = Process.Start(startInfo)
-                    ?? throw new InvalidOperationException("Failed to start osu!.");
+                WaitForGameWindow(osuProcess);
+                WaitForSupportedTarget(osuProcess);
+            }
+            catch (OsuExitedDuringStartupException e)
+            {
+                throw new InvalidOperationException(
+                    "osu! closed before it was ready. Start the patcher again and use a supported osu! Stable version.",
+                    e);
+            }
 
-                try
-                {
-                    WaitForGameWindow(osuProcess);
-                    WaitForSupportedTarget(osuProcess);
-                }
-                catch (OsuExitedDuringStartupException) when (attempt == 0)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    InjectIntoProcess(osuProcess.Id, injectionDirectory);
-                    return;
-                }
-                catch
-                {
-                    StopOsuProcess(osuProcess);
-                    if (attempt == 0)
-                        continue;
-
-                    throw;
-                }
+            try
+            {
+                InjectIntoProcess(osuProcess.Id, injectionDirectory);
+            }
+            catch (Exception e)
+            {
+                throw new InjectionFailedException(
+                    "Injection failed. Close osu!, make sure both programs run with the same permissions, and use a supported osu! Stable version.",
+                    e);
             }
         }
         finally
@@ -126,21 +125,18 @@ internal static class Injector
         proc.Inject(dllPath, "Osu.Patcher.Hook.Hook", "Initialize");
     }
 
-    private static void StopOsuProcess(Process process)
+    private static void EnsureOsuNotRunning()
     {
-        if (process.HasExited)
-            return;
-
-        try
+        var running = false;
+        foreach (var process in Process.GetProcessesByName("osu!"))
         {
-            process.Kill(entireProcessTree: true);
-        }
-        catch (InvalidOperationException) when (process.HasExited)
-        {
-            return;
+            using (process)
+                running |= !process.HasExited;
         }
 
-        process.WaitForExit();
+        if (running)
+            throw new InvalidOperationException(
+                "osu! is already running. Close osu! completely, then start Inlayo-patcher again.");
     }
 
     /// <summary>
@@ -188,7 +184,7 @@ internal static class Injector
         };
 
         if (dialog.ShowDialog() != DialogResult.OK)
-            throw new OperationCanceledException();
+            throw new UserCancelledException();
 
         if (!IsOsuExecutable(dialog.FileName))
             throw new FileNotFoundException("The selected file is not osu!.exe.");
@@ -250,6 +246,48 @@ internal static class Injector
         return injectionDirectory;
     }
 
+    private static string GetUserFacingError(Exception error)
+    {
+        if (error is InjectionFailedException injectionError)
+            return injectionError.Message;
+
+        if (error is HttpRequestException httpError)
+        {
+            if (httpError.StatusCode == HttpStatusCode.NotFound)
+                return "The patcher server could not find the required files (HTTP 404). The server may be offline or the files may not be uploaded. Please try again later.";
+
+            if (httpError.StatusCode is { } statusCode)
+            {
+                if ((int)statusCode >= 500)
+                    return $"The patcher server is temporarily unavailable (HTTP {(int)statusCode}). Please try again later.";
+
+                return $"The patcher server rejected the request (HTTP {(int)statusCode}). Please contact the maintainer.";
+            }
+
+            return "Could not connect to the patcher server. It may be offline, or your internet connection may be unavailable. Please try again later.";
+        }
+
+        if (error is TaskCanceledException)
+            return "The patcher server did not respond in time. Check your internet connection and try again.";
+
+        if (error is UnauthorizedAccessException)
+            return "Access was denied. Close osu! and make sure Inlayo-patcher has permission to access the osu! folder. Run both programs with the same permission level.";
+
+        if (error is Win32Exception { NativeErrorCode: 5 })
+            return "Windows denied access. Run osu! and Inlayo-patcher with the same permission level, then try again.";
+
+        if (error is Win32Exception { NativeErrorCode: 2 })
+            return "osu!.exe could not be found. Select the correct osu! installation and try again.";
+
+        if (error is TimeoutException)
+            return "osu! did not become ready in time. Close it and try again with a supported osu! Stable version.";
+
+        if (error is FileNotFoundException or InvalidOperationException)
+            return error.Message;
+
+        return $"An unexpected error occurred: {error.Message}";
+    }
+
     private static void LoadInjectorDependencies(string injectionDirectory)
     {
         AssemblyLoadContext.Default.LoadFromAssemblyPath(
@@ -276,7 +314,7 @@ internal static class Injector
             if (lastStatus == ProcessStatus.ArchitectureMismatch)
             {
                 throw new InvalidOperationException(
-                    "The patcher and osu! have incompatible architectures. This build requires 32-bit osu!.");
+                    "This patcher requires 32-bit osu!. Install or select the 32-bit osu! version and try again.");
             }
 
             if (lastStatus == ProcessStatus.Ok)
@@ -285,7 +323,7 @@ internal static class Injector
                 if (architecture != ProcessArchitecture.NetFrameworkV4)
                 {
                     throw new InvalidOperationException(
-                        $"Unsupported osu! runtime: {architecture}. This patcher requires .NET Framework 4.x.");
+                        "This patcher requires osu! running on .NET Framework 4.x. Use a supported osu! Stable version.");
                 }
 
                 return;
@@ -297,11 +335,11 @@ internal static class Injector
         var detail = lastStatus switch
         {
             ProcessStatus.NoRuntimeFound =>
-                "The game's .NET Framework runtime was not detected. Make sure osu! has fully loaded and try again.",
+                "The .NET Framework runtime was not detected. Make sure osu! has finished starting and try again.",
             _ =>
-                "Could not inspect the game process. Run the patcher and osu! at the same privilege level.",
+                "Could not inspect osu!. Run Inlayo-patcher and osu! with the same permission level.",
         };
-        throw new TimeoutException($"Cannot inject into osu! (PID {processId}): {detail} Status: {lastStatus}.");
+        throw new TimeoutException(detail);
     }
 
     private static void WaitForGameWindow(Process process)
@@ -320,10 +358,19 @@ internal static class Injector
             System.Threading.Thread.Sleep(250);
         }
 
-        throw new TimeoutException("Timed out waiting for the osu! window to appear.");
+        throw new TimeoutException("The osu! window did not appear in time. Close osu! and try again.");
     }
 
     private sealed class OsuExitedDuringStartupException(string message) : InvalidOperationException(message)
+    {
+    }
+
+    private sealed class InjectionFailedException(string message, Exception innerException)
+        : InvalidOperationException(message, innerException)
+    {
+    }
+
+    private sealed class UserCancelledException : Exception
     {
     }
 
