@@ -18,10 +18,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Setup .NET Core
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.x.x
+          dotnet-version: 11.0.x
 
       - name: Setup .NET Framework
         uses: microsoft/setup-msbuild@v2
@@ -31,15 +31,15 @@ jobs:
         with:
           target: i686-pc-windows-msvc
 
-      - name: Build
-        run: dotnet build Osu.Patcher.Injector
+      - name: Publish
+        run: dotnet publish Osu.Patcher.Injector -c Release -r win-x86 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 
       - name: Upload Injector artifact
         uses: actions/upload-artifact@v4
         with:
-          name: osu!patcher-debug
+          name: Inlayo-patcher
           if-no-files-found: error
-          path: .\Osu.Patcher.Injector\bin\Debug\net8.0\**
+          path: .\Osu.Patcher.Injector\bin\Release\net11.0\win-x86\publish\Inlayo-patcher.exe
       
       - name: Run stub tests
         run: dotnet run --project Osu.Stubs.Tests

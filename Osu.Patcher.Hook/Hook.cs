@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
 using HarmonyLib;
 using JetBrains.Annotations;
 using Osu.Patcher.Hook.Patches;
-using Osu.Performance;
+using Osu.Patcher.Hook.Patches.Relax;
 using Osu.Stubs.Wrappers;
 using Osu.Utils;
 
@@ -16,13 +13,15 @@ namespace Osu.Patcher.Hook;
 [UsedImplicitly]
 public static class Hook
 {
-    private const string GithubUrl = "https://github.com/rushiiMachine/osu-patcher";
+    private const string GithubUrl = "https://github.com/Inlayo/osu-patcher";
     private static Harmony _harmony = null!;
-
-    /// <summary>
-    ///     An instance of all patch options that have been initialized.
-    /// </summary>
-    public static IReadOnlyList<PatchOptions> PatchOptions { get; private set; } = null!;
+    private static readonly Type[] PatchOrder =
+    [
+        typeof(AutoSaveRelaxScores),
+        typeof(AllowRelaxLowHpGlow),
+        typeof(AllowRelaxDrawMisses),
+        typeof(AllowRelaxComboBreakSound),
+    ];
 
     /// <summary>
     ///     Entry point into the hook called by the injector.
@@ -31,61 +30,47 @@ public static class Hook
     public static int Initialize(string _)
     {
         var osuDir = Path.GetDirectoryName(OsuAssembly.Assembly.Location)!;
+        var isStableRelease = IsStableRelease(osuDir);
 
         try
         {
             Notifications.ShowMessage(
-                "Loading osu!patcher...",
+                "Loading Inlayo-patcher...",
                 NotificationColor.Neutral,
-                3000);
+                2500);
         }
-        catch (Exception e)
+        catch
         {
-            Console.WriteLine(e);
         }
-
-#if DEBUG
-        ConsoleHook.InitializeConsoleOutput();
-        DebugHook.Initialize();
 
         try
         {
-            // MSBuild is flimsy with building rosu-ffi on up-to-date builds, try linking early
-            Marshal.PrelinkAll(typeof(Native));
+            _harmony = new Harmony("Inlayo-patcher");
+            var allPatchesApplied = InitializePatches(_harmony, isStableRelease);
+
+            if (!allPatchesApplied)
+            {
+                ShowErrorNotification();
+            }
+
+            if (isStableRelease && allPatchesApplied)
+            {
+                Notifications.ShowMessage(
+                    "Inlayo-patcher launched!",
+                    NotificationColor.Neutral,
+                    5000,
+                    () => { Process.Start(GithubUrl); });
+            }
+            else if (!isStableRelease)
+            {
+                Notifications.ShowMessage(
+                    "AutoSave Relax Scores is Stable-only; it is disabled on Cutting Edge/Beta.",
+                    NotificationColor.Warning,
+                    8000);
+            }
         }
-        catch (Exception e)
+        catch
         {
-            Console.WriteLine($"MSBuild broke again; clean & rebuild: {e}");
-            ShowErrorNotification();
-            return 0;
-        }
-#else
-        ConsoleHook.InitializeLogOutput(osuDir);
-#endif
-
-        try
-        {
-            // Load settings
-            var settings = Settings.ReadFromDisk(osuDir);
-            PatchOptions = Patches.PatchOptions.CreateAllPatchOptions().ToList();
-            PatchOptions.Do(options => options.Load(settings));
-
-            _harmony = new Harmony("osu!patcher");
-            InitializePatches(_harmony);
-
-            // Forcefully reload options to allow patches to inject new options
-            OptionsUtils.ReloadOptions();
-
-            Notifications.ShowMessage(
-                "osu!patcher initialized!",
-                NotificationColor.Neutral,
-                5000,
-                () => { Process.Start(GithubUrl); }
-            );
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine(e);
             ShowErrorNotification();
         }
 
@@ -96,26 +81,55 @@ public static class Hook
     ///     For every type annotated with <c>[HarmonyPatch]</c> in this assembly, initialize the patch.
     /// </summary>
     /// <param name="harmony">Harmony patcher instance</param>
-    private static void InitializePatches(Harmony harmony)
+    private static bool InitializePatches(Harmony harmony, bool isStableRelease)
     {
-        foreach (var type in AccessTools.GetTypesFromAssembly(typeof(Hook).Assembly))
+        var allPatchesApplied = true;
+
+        foreach (var type in PatchOrder)
         {
-            if (!OsuPatchProcessor.IsOsuPatch(type))
+            if (!type.IsDefined(typeof(OsuPatch), inherit: false))
                 continue;
 
-            Debug.WriteLine($"Processing Patch {type.Name}", "Hook");
+            if (type == typeof(AutoSaveRelaxScores) && !isStableRelease)
+                continue;
 
             try
             {
-                new OsuPatchProcessor(harmony, type).Patch();
+                harmony.CreateClassProcessor(type).Patch();
             }
-            catch (Exception e)
+            catch
             {
-                Console.WriteLine($"Failed to initialize patch {type.Name}");
-                Console.WriteLine(e);
-                ShowErrorNotification();
+                allPatchesApplied = false;
             }
         }
+
+        return allPatchesApplied;
+    }
+
+    private static bool IsStableRelease(string osuDir)
+    {
+        var configPath = Path.Combine(osuDir, "osu!.cfg");
+
+        try
+        {
+            foreach (var line in File.ReadLines(configPath))
+            {
+                var separator = line.IndexOf('=');
+                if (separator < 0 ||
+                    !line.Substring(0, separator).Trim().Equals("_ReleaseStream", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var stream = line.Substring(separator + 1).Trim();
+                return stream.Equals("Stable40", StringComparison.OrdinalIgnoreCase) ||
+                       stream.Equals("Stable", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch
+        {
+            // Fail closed if the installation's release stream cannot be verified.
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -126,15 +140,13 @@ public static class Hook
         try
         {
             Notifications.ShowMessage(
-                "osu!patcher experienced an error! Click to report.",
+                "Inlayo-patcher failed. Click here for help.",
                 NotificationColor.Error,
                 20000,
                 () => { Process.Start($"{GithubUrl}/issues"); });
         }
-        catch (Exception e2)
+        catch
         {
-            Console.WriteLine("Failed to show error notification!");
-            Console.WriteLine(e2);
         }
     }
 }

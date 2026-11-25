@@ -51,9 +51,7 @@ public class TestStubs
 
         OsuLoader.UpdateAndLoad().Wait();
 
-        var stubs = StubAggregator.CollectPlainStubs()
-            .Concat(StubAggregator.CollectGenericStubs())
-            .ToArray();
+        var stubs = StubAggregator.CollectPlainStubs().ToArray();
 
         Array.Sort(stubs, (a, b) =>
             string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));

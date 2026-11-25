@@ -2,7 +2,7 @@
   <img align="center" width="400" alt="osu! logo" src=".github/assets/logo.png">
 </p>
 
-# osu! patcher
+# Inlayo-patcher
 
 Apply several fixes to osu! make playing Relax more enjoyable.
 
@@ -18,24 +18,11 @@ Using this on official Bancho servers WILL get you banned.
 - Show misses on hit objects while playing Relax
 - Re-enable combobreak sounds with Relax enabled
 - Save all Relax scores to local leaderboards automatically
-- Allow failing with Relax enabled
 - Re-enable the low hp glow (with shaders on)
 
 <sup>Note: Relax refers to Relax *or* Autopilot</sup>
 
-### PP
-- Show a live pp counter during gameplay and replays
-- Switch between Bancho and ~~Akatsuki~~ (soon) pp calculators
-- ~~Show PP on local leaderboards~~ (soon)
-
-### Mods
-- Always faintly show active mods during gameplay
-- Auto restart when failed due to Sudden Death mod
-
-### UI
-- Increase the thumbnail opacity in song select
-- Allow opening settings during gameplay with Ctrl+O
-- Other miscellaneous fixes
+AutoSave Relax Scores is enabled only on the Stable release stream. On Cutting Edge or Beta, it is skipped and an in-game warning is shown.
 
 <!-- ### Other -->
 <!-- - Download from beatmap mirrors when offline -->
@@ -55,9 +42,11 @@ into processes. If you aren't convinced it isn't a false positive, feel free to 
 
 ## Compiling
 
-1. Install the .NET SDK 8, the .NET Framework 4.5.2 developer pack, and Rust (rustup/cargo).
-2. Run `dotnet build Osu.Patcher.Injector -c Release`
-3. Output will be located in `./Osu.Patcher.Injector/bin/Release/net8.0/`
+1. Install the .NET SDK 11 and the .NET Framework 4.8.1 developer pack.
+2. Run `dotnet publish Osu.Patcher.Injector -c Release -r win-x86 --no-self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true`
+3. Output will be located at `./Osu.Patcher.Injector/bin/Release/net11.0/win-x86/publish/Inlayo-patcher.exe`
+
+The published executable is a single file and does not include the .NET runtime. Install the .NET 11 x86 runtime on the target computer to run it.
 
 ## How
 

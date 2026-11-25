@@ -1,10 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
 using JetBrains.Annotations;
-using Osu.Utils.Extensions;
 using Osu.Utils.IL;
 
 namespace Osu.Patcher.Hook.Patches.Relax;
@@ -48,7 +48,7 @@ internal static class AutoSaveRelaxScores
         OpCodes.And,
         OpCodes.Ldc_I4_0,
         OpCodes.Cgt,
-        OpCodes.Brtrue, // All no-oped (24 inst)
+        OpCodes.Brtrue, // Relax early return
         OpCodes.Ldsfld,
         OpCodes.Ldfld,
         OpCodes.Call,
@@ -60,22 +60,72 @@ internal static class AutoSaveRelaxScores
         OpCodes.And,
         OpCodes.Ldc_I4_0,
         OpCodes.Cgt,
-        OpCodes.Brtrue, // <-------------
+        OpCodes.Brtrue, // Relax2 early return
     ];
 
     [UsedImplicitly]
     [HarmonyTargetMethod]
-    private static MethodBase Target() => OpCodeMatcher.FindMethodBySignature(null, Signature)!;
+    private static MethodBase Target()
+    {
+        var target = OpCodeMatcher.FindMethodBySignature(
+            null,
+            Signature,
+            methodFilter: IsTargetCandidate);
+        if (target == null)
+            throw new MissingMethodException("Could not find the AutoSaveRelaxScores target method.");
+
+        return target;
+    }
+
+    private static bool IsTargetCandidate(MethodInfo method)
+    {
+        if (method.IsStatic || method.ReturnType != typeof(void))
+            return false;
+
+        var parameters = method.GetParameters();
+        return parameters.Length == 1 && parameters[0].ParameterType == typeof(bool);
+    }
 
     [UsedImplicitly]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
-        instructions = instructions.NoopAfterSignature(
-            Signature.Take(Signature.Length - 24).ToArray(),
-            24
-        );
+        var code = instructions.ToList();
 
-        return instructions;
+        var signatureStart = -1;
+        for (var start = 0; start <= code.Count - Signature.Length; start++)
+        {
+            var matches = true;
+            for (var offset = 0; offset < Signature.Length; offset++)
+            {
+                if (code[start + offset].opcode != Signature[offset])
+                {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (matches)
+            {
+                signatureStart = start;
+                break;
+            }
+        }
+
+        if (signatureStart < 0)
+            throw new InvalidOperationException("Could not find the full AutoSaveRelaxScores signature.");
+
+        // The two brtrue instructions are the early returns for Relax and Relax2.
+        // Their condition leaves one bool on the evaluation stack. Pop that bool
+        // instead of emitting a new branch label; this keeps all original labels,
+        // branch operands, and exception-block metadata untouched.
+        foreach (var offset in new[] { 18, 30 })
+        {
+            var instruction = code[signatureStart + offset];
+            instruction.opcode = OpCodes.Pop;
+            instruction.operand = null;
+        }
+
+        return code;
     }
 }

@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build">
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
+        <OutputType>WinExe</OutputType>
         <ApplicationIcon>icon.ico</ApplicationIcon>
         <ApplicationVersion>1.0.0</ApplicationVersion>
-        <AssemblyName>osu!.patcher</AssemblyName>
+        <AssemblyName>Inlayo-patcher</AssemblyName>
         <RootNamespace>Osu.Patcher.Injector</RootNamespace>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net11.0</TargetFramework>
         <LangVersion>12</LangVersion>
         <Nullable>enable</Nullable>
         <NoWarn>$(NoWarn);NU1702</NoWarn> <!-- ProjectReferences used here are expected to not match target framework -->
+        <NuGetAudit>false</NuGetAudit>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
         <DebugType>none</DebugType>
@@ -18,8 +19,20 @@
     <ItemGroup>
         <PackageReference Include="HoLLy.ManagedInjector" Version="1.0.0"/>
         <PackageReference Include="System.Management" Version="7.0.1"/>
-        <ProjectReference Include="../Osu.Patcher.Hook/Osu.Patcher.Hook.csproj">
-            <SetTargetFramework>TargetFramework=net452</SetTargetFramework>
-        </ProjectReference>
+        <EmbeddedResource Include="../Osu.Patcher.Hook/bin/$(Configuration)/net481/$(RuntimeIdentifier)/0Harmony.dll">
+            <LogicalName>0Harmony.dll</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="../Osu.Patcher.Hook/bin/$(Configuration)/net481/$(RuntimeIdentifier)/JetBrains.Annotations.dll">
+            <LogicalName>JetBrains.Annotations.dll</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="../Osu.Patcher.Hook/bin/$(Configuration)/net481/$(RuntimeIdentifier)/osu!.hook.dll">
+            <LogicalName>osu!.hook.dll</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="../Osu.Patcher.Hook/bin/$(Configuration)/net481/$(RuntimeIdentifier)/osu!.stubs.dll">
+            <LogicalName>osu!.stubs.dll</LogicalName>
+        </EmbeddedResource>
+        <EmbeddedResource Include="../Osu.Patcher.Hook/bin/$(Configuration)/net481/$(RuntimeIdentifier)/utils.dll">
+            <LogicalName>utils.dll</LogicalName>
+        </EmbeddedResource>
     </ItemGroup>
 </Project>

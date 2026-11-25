@@ -13,11 +13,13 @@ public static class OpCodeMatcher
     /// <param name="searchType">The type to shrink searching to, otherwise all types will be searched.</param>
     /// <param name="signature">A set of sequential OpCodes to match.</param>
     /// <param name="entireMethod">Whether the signature is the entire method to search for.</param>
+    /// <param name="methodFilter">An optional predicate to filter candidate methods before reading their IL.</param>
     /// <returns>The found method or null if none found.</returns>
     public static MethodInfo? FindMethodBySignature(
         Type? searchType,
         IReadOnlyList<OpCode> signature,
-        bool entireMethod = false)
+        bool entireMethod = false,
+        Func<MethodInfo, bool>? methodFilter = null)
     {
         if (signature.Count <= 0) return null;
 
@@ -29,37 +31,9 @@ public static class OpCodeMatcher
                                                | BindingFlags.Public
                                                | BindingFlags.NonPublic))
         {
-            var instructions = method.GetMethodBody()?.GetILAsByteArray();
-            if (instructions == null) continue;
+            if (methodFilter != null && !methodFilter(method))
+                continue;
 
-            if (InstructionsMatchesSignature(instructions, signature, entireMethod))
-                return method;
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    ///     Search for a constructor inside the osu! assembly by an IL OpCode signature.
-    /// </summary>
-    /// <param name="searchType">The type to shrink searching to, otherwise all types will be searched.</param>
-    /// <param name="signature">A set of sequential OpCodes to match.</param>
-    /// <param name="entireMethod">Whether the signature is the entire method to search for.</param>
-    /// <returns>The found constructor (method) or null if none found.</returns>
-    public static ConstructorInfo? FindConstructorBySignature(
-        Type? searchType,
-        IReadOnlyList<OpCode> signature,
-        bool entireMethod = false)
-    {
-        if (signature.Count <= 0) return null;
-
-        var searchTypes = searchType == null ? OsuAssembly.Types : [searchType];
-
-        foreach (var type in searchTypes)
-        foreach (var method in type.GetConstructors(BindingFlags.Instance
-                                                    | BindingFlags.Public
-                                                    | BindingFlags.NonPublic))
-        {
             var instructions = method.GetMethodBody()?.GetILAsByteArray();
             if (instructions == null) continue;
 
@@ -74,11 +48,11 @@ public static class OpCodeMatcher
     ///     Check if some IL byte instructions contain a certain set of OpCodes.
     /// </summary>
     /// <param name="ilInstructions">
-    ///     Raw IL instruction byte data obtained through <see cref="MethodBody.GetILAsByteArray()" /> for example.
+    ///     Raw IL byte instruction data obtained through <see cref="MethodBody.GetILAsByteArray()" />.
     /// </param>
-    /// <param name="signature">A set of sequential OpCodes to search for in instructions.</param>
+    /// <param name="signature">A set of sequential OpCodes to search for.</param>
     /// <param name="entireMethod">Whether the signature should be the entire method.</param>
-    /// <returns></returns>
+    /// <returns>Whether the signature matches.</returns>
     private static bool InstructionsMatchesSignature(
         IReadOnlyList<byte> ilInstructions,
         IReadOnlyList<OpCode> signature,

@@ -9,11 +9,3 @@ namespace Osu.Stubs;
 /// </summary>
 [AttributeUsage(AttributeTargets.Field)]
 public class Stub : Attribute;
-
-/// <summary>
-///     Stub marker on a static field that provides an instance of the
-///     current stub class to be used as the target for getting <see cref="ILazy{T}" />
-///     instances that target generic type definitions.
-/// </summary>
-[AttributeUsage(AttributeTargets.Field)]
-public class StubInstance : Attribute;

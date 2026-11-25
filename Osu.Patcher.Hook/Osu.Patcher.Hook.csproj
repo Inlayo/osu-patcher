@@ -4,7 +4,7 @@
         <OutputType>Library</OutputType>
         <RootNamespace>Osu.Patcher.Hook</RootNamespace>
         <AssemblyName>osu!.hook</AssemblyName>
-        <TargetFramework>net452</TargetFramework>
+        <TargetFramework>net481</TargetFramework>
         <LangVersion>12</LangVersion>
         <Nullable>enable</Nullable>
     </PropertyGroup>
@@ -25,18 +25,16 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net481" Version="1.0.3" PrivateAssets="all" />
         <PackageReference Include="JetBrains.Annotations" Version="2023.3.0" PrivateAssets="all"/>
-        <ProjectReference Include="../Osu.Performance/Osu.Performance.csproj">
-            <SetTargetFramework>TargetFramework=net452</SetTargetFramework>
-        </ProjectReference>
         <ProjectReference Include="../Osu.Stubs/Osu.Stubs.csproj">
-            <SetTargetFramework>TargetFramework=net452</SetTargetFramework>
+            <SetTargetFramework>TargetFramework=net481</SetTargetFramework>
         </ProjectReference>
 
         <!-- I have to do this stupid shit because NuGet doesn't respect ProjectReference.SetTargetFramework for transitive dependencies -->
         <!-- https://github.com/NuGet/Home/issues/12436 -->
         <!-- https://github.com/NuGet/Home/issues/5986#issuecomment-732401471 -->
-        <PackageReference Include="Lib.Harmony" Version="2.3.1.1" PrivateAssets="all" GeneratePathProperty="true"/>
+        <PackageReference Include="Lib.Harmony" Version="2.4.3" PrivateAssets="all" GeneratePathProperty="true"/>
         <Content Include="$(PkgLib_Harmony)\lib\net452\0Harmony.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>

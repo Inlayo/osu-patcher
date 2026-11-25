@@ -3,7 +3,7 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <RootNamespace>Osu.Stubs.Tests</RootNamespace>
-        <TargetFramework>net462</TargetFramework>
+        <TargetFramework>net481</TargetFramework>
         <PlatformTarget>x86</PlatformTarget> <!-- Running in 32bit is necessary for loading in osu! -->
         <LangVersion>12</LangVersion>
         <Nullable>enable</Nullable>
