@@ -15,9 +15,14 @@ internal static class Injector
     {
         try
         {
-            var processId = GetOsuPid();
+            var processId = GetOsuPid(out var releaseStream);
             using var proc = new InjectableProcess(processId);
-            proc.Inject(ExtractHookAssembly(), "Osu.Patcher.Hook.Hook", "Initialize");
+
+            var entryPoint = IsSupportedReleaseStream(releaseStream)
+                ? "Initialize"
+                : "NotifyUnsupportedRelease";
+
+            proc.Inject(ExtractHookAssembly(), "Osu.Patcher.Hook.Hook", entryPoint);
         }
         catch (UserFacingException e)
         {
@@ -63,13 +68,49 @@ internal static class Injector
 
     private sealed class UserFacingException(string message) : Exception(message);
 
+    private static bool IsSupportedReleaseStream(string? releaseStream) =>
+        string.Equals(releaseStream, "Stable", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(releaseStream, "Stable40", StringComparison.OrdinalIgnoreCase);
+
+    private static string? GetReleaseStream(string? executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath))
+            return null;
+
+        var osuDir = Path.GetDirectoryName(executablePath);
+        if (string.IsNullOrWhiteSpace(osuDir))
+            return null;
+
+        var configPath = Path.Combine(osuDir, "osu!.cfg");
+
+        try
+        {
+            foreach (var line in File.ReadLines(configPath))
+            {
+                var separator = line.IndexOf('=');
+                if (separator < 0 ||
+                    !line.Substring(0, separator).Trim().Equals("_ReleaseStream", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                return line.Substring(separator + 1).Trim();
+            }
+        }
+        catch
+        {
+            // Unknown streams are routed to the warning-only hook entry point.
+        }
+
+        return null;
+    }
+
     /// <summary>
     ///     Find a <c>osu!.exe</c> process that has a <c>devserver</c> in the cli arguments. (Not connected to Bancho)
     /// </summary>
     /// <returns>The process id of the first matching process.</returns>
     /// <exception cref="Exception">If found invalid osu! process or no process at all.</exception>
-    private static uint GetOsuPid()
+    private static uint GetOsuPid(out string? releaseStream)
     {
+        releaseStream = null;
         using var mgmt = new ManagementClass("Win32_Process");
         using var processes = mgmt.GetInstances();
 
@@ -87,6 +128,7 @@ internal static class Injector
                 throw new UserFacingException(
                     "osu! is connected to Bancho. Launch it with a custom -devserver and try again.");
 
+            releaseStream = GetReleaseStream(process["ExecutablePath"] as string);
             return pid;
         }
 

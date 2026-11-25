@@ -22,7 +22,7 @@ Using this on official Bancho servers WILL get you banned.
 
 <sup>Note: Relax refers to Relax *or* Autopilot</sup>
 
-AutoSave Relax Scores is enabled only on the Stable release stream. On Cutting Edge or Beta, it is skipped and an in-game warning is shown.
+Patches are applied only on the Stable (`Stable`/`Stable40`) release stream. On Cutting Edge, Beta, or an unknown stream, the injector calls a warning-only hook entry point and skips patch initialization.
 
 <!-- ### Other -->
 <!-- - Download from beatmap mirrors when offline -->
@@ -43,8 +43,9 @@ into processes. If you aren't convinced it isn't a false positive, feel free to 
 ## Compiling
 
 1. Install the .NET SDK 11 and the .NET Framework 4.8.1 developer pack.
-2. Run `dotnet publish Osu.Patcher.Injector -c Release -r win-x86 --no-self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true`
-3. Output will be located at `./Osu.Patcher.Injector/bin/Release/net11.0/win-x86/publish/Inlayo-patcher.exe`
+2. Build the hook assemblies that are embedded in the injector: `dotnet build Osu.Patcher.Hook -c Release -r win-x86`
+3. Publish the injector: `dotnet publish Osu.Patcher.Injector -c Release -r win-x86 --no-self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true`
+4. Output will be located at `./Osu.Patcher.Injector/bin/Release/net11.0/win-x86/publish/Inlayo-patcher.exe`
 
 The published executable is a single file and does not include the .NET runtime. Install the .NET 11 x86 runtime on the target computer to run it.
 
