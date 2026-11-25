@@ -24,8 +24,6 @@ internal static class OsuLoader
 
         return _loadTask = Task.Run(async () =>
         {
-            Console.WriteLine("Updating osu!");
-
             var osuDir = Path.Combine(Assembly.GetExecutingAssembly().Location, "../osu!");
             var osuExe = Path.Combine(osuDir, "osu!.exe");
 
@@ -34,8 +32,6 @@ internal static class OsuLoader
                 Directory.CreateDirectory(osuDir);
                 await OsuApi.DownloadOsu(osuDir);
             }
-
-            Console.WriteLine("Loading osu!.exe");
 
             // Add osu! directory to assembly search path
             AppDomain.CurrentDomain.AppendPrivatePath(osuDir);

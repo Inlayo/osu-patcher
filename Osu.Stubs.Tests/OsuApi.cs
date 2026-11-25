@@ -26,8 +26,6 @@ public static class OsuApi
     /// </summary>
     public static async Task<List<OsuUpdateFile>> GetReleaseFiles(ReleaseStream stream)
     {
-        Console.WriteLine("Fetching latest osu! update info");
-
         var url = $"https://osu.ppy.sh/web/check-updates.php" +
                   $"?action=check" +
                   $"&stream={stream.ToString().ToLower()}" +
@@ -56,11 +54,8 @@ public static class OsuApi
 
         Parallel.ForEach(updateFiles, updateFile =>
         {
-            Console.WriteLine($"Downloading {updateFile.FileName}");
             DownloadFile(updateFile.DownloadUrl, Path.Combine(dir, updateFile.FileName)).Wait();
         });
-
-        Console.WriteLine("Finished downloading osu!");
     }
 
     private static async Task DownloadFile(string url, string path)

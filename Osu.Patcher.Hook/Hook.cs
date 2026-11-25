@@ -25,28 +25,28 @@ public static class Hook
     ];
 
     /// <summary>
-    ///     Warning-only entry point used when the injector detects an unsupported release stream.
+    ///     Warning-only entry point used when the injector detects an unsupported osu! version.
     /// </summary>
     [UsedImplicitly]
     public static int NotifyUnsupportedRelease(string _)
     {
         var osuDir = Path.GetDirectoryName(OsuAssembly.Assembly.Location)!;
-        ShowUnsupportedReleaseWarning(GetReleaseStream(osuDir));
+        ShowUnsupportedVersionWarning(GetLastVersion(osuDir));
         return 0;
     }
 
     /// <summary>
-    ///     Full patch entry point. The injector calls this only for Stable/Stable40.
+    ///     Full patch entry point. The injector calls this only when LastVersion contains "stable".
     /// </summary>
     [UsedImplicitly]
     public static int Initialize(string _)
     {
         var osuDir = Path.GetDirectoryName(OsuAssembly.Assembly.Location)!;
-        var releaseStream = GetReleaseStream(osuDir);
+        var lastVersion = GetLastVersion(osuDir);
 
-        if (!IsSupportedReleaseStream(releaseStream))
+        if (!IsStableVersion(lastVersion))
         {
-            ShowUnsupportedReleaseWarning(releaseStream);
+            ShowUnsupportedVersionWarning(lastVersion);
             return 0;
         }
 
@@ -63,6 +63,7 @@ public static class Hook
 
         try
         {
+            Harmony.DEBUG = false;
             _harmony = new Harmony("Inlayo-patcher");
             var allPatchesApplied = InitializePatches(_harmony);
 
@@ -114,9 +115,9 @@ public static class Hook
         return allPatchesApplied;
     }
 
-    private static string? GetReleaseStream(string osuDir)
+    private static string? GetLastVersion(string osuDir)
     {
-        var configPath = Path.Combine(osuDir, "osu!.cfg");
+        var configPath = Path.Combine(osuDir, $"osu!.{Environment.UserName}.cfg");
 
         try
         {
@@ -124,7 +125,7 @@ public static class Hook
             {
                 var separator = line.IndexOf('=');
                 if (separator < 0 ||
-                    !line.Substring(0, separator).Trim().Equals("_ReleaseStream", StringComparison.OrdinalIgnoreCase))
+                    !line.Substring(0, separator).Trim().Equals("LastVersion", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 return line.Substring(separator + 1).Trim();
@@ -132,22 +133,24 @@ public static class Hook
         }
         catch
         {
-            // Fail closed if the installation's release stream cannot be verified.
+            // Fail closed if the installed osu! version cannot be verified.
         }
 
         return null;
     }
 
-    private static bool IsSupportedReleaseStream(string? releaseStream) =>
-        string.Equals(releaseStream, "Stable", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(releaseStream, "Stable40", StringComparison.OrdinalIgnoreCase);
+    private static bool IsStableVersion(string? lastVersion) =>
+        lastVersion != null &&
+        !string.IsNullOrWhiteSpace(lastVersion) &&
+        lastVersion.IndexOf("stable", StringComparison.OrdinalIgnoreCase) >= 0 &&
+        lastVersion.IndexOf("unstable", StringComparison.OrdinalIgnoreCase) < 0;
 
-    private static void ShowUnsupportedReleaseWarning(string? releaseStream)
+    private static void ShowUnsupportedVersionWarning(string? lastVersion)
     {
-        var detectedStream = string.IsNullOrWhiteSpace(releaseStream)
-            ? "unknown (could not read osu!.cfg)"
-            : releaseStream;
-        var message = $"Unsupported osu! release stream: {detectedStream}. Please use the Stable version of osu!.";
+        var detectedVersion = string.IsNullOrWhiteSpace(lastVersion)
+            ? "unknown (could not read LastVersion)"
+            : lastVersion;
+        var message = $"Unsupported osu! version: {detectedVersion}. Please use the Stable version of osu!.";
 
         try
         {

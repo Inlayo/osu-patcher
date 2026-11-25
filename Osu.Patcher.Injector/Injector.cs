@@ -15,10 +15,10 @@ internal static class Injector
     {
         try
         {
-            var processId = GetOsuPid(out var releaseStream);
+            var processId = GetOsuPid(out var lastVersion);
             using var proc = new InjectableProcess(processId);
 
-            var entryPoint = IsSupportedReleaseStream(releaseStream)
+            var entryPoint = IsStableVersion(lastVersion)
                 ? "Initialize"
                 : "NotifyUnsupportedRelease";
 
@@ -68,11 +68,13 @@ internal static class Injector
 
     private sealed class UserFacingException(string message) : Exception(message);
 
-    private static bool IsSupportedReleaseStream(string? releaseStream) =>
-        string.Equals(releaseStream, "Stable", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(releaseStream, "Stable40", StringComparison.OrdinalIgnoreCase);
+    private static bool IsStableVersion(string? lastVersion) =>
+        lastVersion != null &&
+        !string.IsNullOrWhiteSpace(lastVersion) &&
+        lastVersion.IndexOf("stable", StringComparison.OrdinalIgnoreCase) >= 0 &&
+        lastVersion.IndexOf("unstable", StringComparison.OrdinalIgnoreCase) < 0;
 
-    private static string? GetReleaseStream(string? executablePath)
+    private static string? GetLastVersion(string? executablePath)
     {
         if (string.IsNullOrWhiteSpace(executablePath))
             return null;
@@ -81,7 +83,7 @@ internal static class Injector
         if (string.IsNullOrWhiteSpace(osuDir))
             return null;
 
-        var configPath = Path.Combine(osuDir, "osu!.cfg");
+        var configPath = Path.Combine(osuDir, $"osu!.{Environment.UserName}.cfg");
 
         try
         {
@@ -89,7 +91,7 @@ internal static class Injector
             {
                 var separator = line.IndexOf('=');
                 if (separator < 0 ||
-                    !line.Substring(0, separator).Trim().Equals("_ReleaseStream", StringComparison.OrdinalIgnoreCase))
+                    !line.Substring(0, separator).Trim().Equals("LastVersion", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 return line.Substring(separator + 1).Trim();
@@ -97,7 +99,7 @@ internal static class Injector
         }
         catch
         {
-            // Unknown streams are routed to the warning-only hook entry point.
+            // Unknown versions are routed to the warning-only hook entry point.
         }
 
         return null;
@@ -108,9 +110,9 @@ internal static class Injector
     /// </summary>
     /// <returns>The process id of the first matching process.</returns>
     /// <exception cref="Exception">If found invalid osu! process or no process at all.</exception>
-    private static uint GetOsuPid(out string? releaseStream)
+    private static uint GetOsuPid(out string? lastVersion)
     {
-        releaseStream = null;
+        lastVersion = null;
         using var mgmt = new ManagementClass("Win32_Process");
         using var processes = mgmt.GetInstances();
 
@@ -128,7 +130,7 @@ internal static class Injector
                 throw new UserFacingException(
                     "osu! is connected to Bancho. Launch it with a custom -devserver and try again.");
 
-            releaseStream = GetReleaseStream(process["ExecutablePath"] as string);
+            lastVersion = GetLastVersion(process["ExecutablePath"] as string);
             return pid;
         }
 

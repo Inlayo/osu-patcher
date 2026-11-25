@@ -22,7 +22,7 @@ Using this on official Bancho servers WILL get you banned.
 
 <sup>Note: Relax refers to Relax *or* Autopilot</sup>
 
-Patches are applied only on the Stable (`Stable`/`Stable40`) release stream. On Cutting Edge, Beta, or an unknown stream, the injector calls a warning-only hook entry point and skips patch initialization.
+Patches are applied only when `LastVersion` in `osu!.<Windows username>.cfg` contains `stable` (case-insensitively). On Cutting Edge, Beta, or when the version cannot be read, the injector calls a warning-only hook entry point and skips patch initialization.
 
 <!-- ### Other -->
 <!-- - Download from beatmap mirrors when offline -->
