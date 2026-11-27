@@ -16,12 +16,8 @@ internal static class Injector
         try
         {
             var processId = GetOsuPid(out var lastVersion);
+            var entryPoint = IsStableVersion(lastVersion) ? "Initialize" : "NotifyUnsupportedRelease";
             using var proc = new InjectableProcess(processId);
-
-            var entryPoint = IsStableVersion(lastVersion)
-                ? "Initialize"
-                : "NotifyUnsupportedRelease";
-
             proc.Inject(ExtractHookAssembly(), "Osu.Patcher.Hook.Hook", entryPoint);
         }
         catch (UserFacingException e)
@@ -69,10 +65,31 @@ internal static class Injector
     private sealed class UserFacingException(string message) : Exception(message);
 
     private static bool IsStableVersion(string? lastVersion) =>
-        lastVersion != null &&
-        !string.IsNullOrWhiteSpace(lastVersion) &&
-        lastVersion.IndexOf("stable", StringComparison.OrdinalIgnoreCase) >= 0 &&
-        lastVersion.IndexOf("unstable", StringComparison.OrdinalIgnoreCase) < 0;
+        IsStableVersionFormat(lastVersion);
+
+    private static bool IsStableVersionFormat(string? lastVersion)
+    {
+        if (lastVersion == null || lastVersion.Length < 2 || char.ToLowerInvariant(lastVersion[0]) != 'b')
+            return false;
+
+        var previousWasDigit = false;
+        for (var index = 1; index < lastVersion.Length; index++)
+        {
+            var character = lastVersion[index];
+            if (character >= '0' && character <= '9')
+            {
+                previousWasDigit = true;
+                continue;
+            }
+
+            if (character != '.' || !previousWasDigit || index == lastVersion.Length - 1)
+                return false;
+
+            previousWasDigit = false;
+        }
+
+        return previousWasDigit;
+    }
 
     private static string? GetLastVersion(string? executablePath)
     {

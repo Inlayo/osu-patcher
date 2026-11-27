@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using HarmonyLib;
 using JetBrains.Annotations;
 using Osu.Patcher.Hook.Patches;
@@ -36,7 +35,7 @@ public static class Hook
     }
 
     /// <summary>
-    ///     Full patch entry point. The injector calls this only when LastVersion contains "stable".
+    ///     Full patch entry point. The injector calls this only for a Stable-formatted LastVersion.
     /// </summary>
     [UsedImplicitly]
     public static int Initialize(string _)
@@ -140,10 +139,31 @@ public static class Hook
     }
 
     private static bool IsStableVersion(string? lastVersion) =>
-        lastVersion != null &&
-        !string.IsNullOrWhiteSpace(lastVersion) &&
-        lastVersion.IndexOf("stable", StringComparison.OrdinalIgnoreCase) >= 0 &&
-        lastVersion.IndexOf("unstable", StringComparison.OrdinalIgnoreCase) < 0;
+        IsStableVersionFormat(lastVersion);
+
+    private static bool IsStableVersionFormat(string? lastVersion)
+    {
+        if (lastVersion == null || lastVersion.Length < 2 || char.ToLowerInvariant(lastVersion[0]) != 'b')
+            return false;
+
+        var previousWasDigit = false;
+        for (var index = 1; index < lastVersion.Length; index++)
+        {
+            var character = lastVersion[index];
+            if (character >= '0' && character <= '9')
+            {
+                previousWasDigit = true;
+                continue;
+            }
+
+            if (character != '.' || !previousWasDigit || index == lastVersion.Length - 1)
+                return false;
+
+            previousWasDigit = false;
+        }
+
+        return previousWasDigit;
+    }
 
     private static void ShowUnsupportedVersionWarning(string? lastVersion)
     {
@@ -158,19 +178,8 @@ public static class Hook
         }
         catch
         {
-            // The game notification API may not be ready yet; still make the safety block visible.
-            try
-            {
-                MessageBox(IntPtr.Zero, message, "Inlayo-patcher", 0x30);
-            }
-            catch
-            {
-            }
         }
     }
-
-    [DllImport("user32.dll", EntryPoint = "MessageBoxW", CharSet = CharSet.Unicode, ExactSpelling = true)]
-    private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
 
     /// <summary>
     ///     Show a generic error notification to the user.
